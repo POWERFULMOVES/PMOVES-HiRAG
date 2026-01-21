@@ -13,7 +13,7 @@ Usage:
     app.include_router(health_check_router)
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, List
 import os
@@ -95,13 +95,19 @@ class NATSCheck(DependencyCheck):
         self.nats_url = nats_url
 
     async def check(self) -> bool:
+        nc = None
         try:
             from nats.aio.client import Client as NATS
             nc = await NATS.connect(self.nats_url, connect_timeout=2)
-            await nc.close()
             return True
         except Exception:
             return False
+        finally:
+            if nc:
+                try:
+                    await nc.close()
+                except Exception:
+                    pass
 
 
 class HealthChecker:
@@ -137,7 +143,7 @@ class HealthChecker:
         results = {
             "status": HealthStatus.HEALTHY,
             "service": self.service_name,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         all_healthy = True
@@ -186,14 +192,28 @@ _health_checker = HealthChecker()
 
 
 def health_check(checks: List[DependencyCheck] = None):
-    """Decorator to add health checks to a function."""
+    """
+    Decorator to register health checks for a service.
+
+    NOTE: Checks are registered once at import time, not on each call.
+    Use this decorator on functions that need dependency checks.
+
+    Args:
+        checks: List of dependency checks to register
+
+    Example:
+        @health_check([DatabaseCheck(connect_fn)])
+        async def my_handler():
+            ...
+    """
     def decorator(func: Callable):
+        # Register checks once when decorator is applied, not on each call
+        if checks:
+            for check in checks:
+                _health_checker.add_check(check)
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            checker = _health_checker
-            if checks:
-                for check in checks:
-                    checker.add_check(check)
             return await func(*args, **kwargs)
         return wrapper
     return decorator
@@ -231,8 +251,19 @@ if FASTAPI_AVAILABLE:
 
     @health_check_router.get(HEALTH_CHECK_PATH)
     async def healthz():
-        """Standard health check endpoint."""
-        return await get_health_status()
+        """
+        Standard health check endpoint.
+
+        Returns:
+            - 200 with status "healthy" or "degraded"
+            - 503 with status "unhealthy"
+        """
+        status = await get_health_status()
+
+        # Return proper HTTP status codes
+        if status.get("status") == HealthStatus.UNHEALTHY:
+            return JSONResponse(content=status, status_code=503)
+        return status
 
     def create_health_app(service_name: str = None) -> "FastAPI":
         """Create a minimal FastAPI app with health check."""

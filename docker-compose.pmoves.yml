@@ -8,21 +8,22 @@
 #     my-service:
 #       <<: *env-tier-api
 #       environment:
-#         - SERVICE_NAME=my-service
-#         - SERVICE_SPECIFIC_VAR=value
+#         SERVICE_NAME: my-service
+#         SERVICE_SPECIFIC_VAR: value
 
 version: "3.8"
 
 # PMOVES.AI Environment Loading Anchors
 # These anchors provide tier-based environment file loading
+# NOTE: Use map-based environment vars (not list-based) for proper YAML merging
 x-pmoves-env: &pmoves-env-base
   env_file:
     - env.shared      # Base PMOVES.AI configuration
   environment:
-    - PMOVES_ENV=${PMOVES_ENV:-production}
-    - TIER=${TIER}
-    - NATS_URL=${NATS_URL:-nats://nats:4222}
-    - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
+    PMOVES_ENV: ${PMOVES_ENV:-production}
+    TIER: ${TIER}
+    NATS_URL: ${NATS_URL:-nats://nats:4222}
+    TENSORZERO_URL: ${TENSORZERO_URL:-http://tensorzero-gateway:3030}
 
 # API Tier Environment
 x-env-tier-api: &env-tier-api
@@ -31,9 +32,9 @@ x-env-tier-api: &env-tier-api
     - env.shared
     - env.tier-api    # API tier specific configuration
   environment:
-    - TIER=api
-    - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-100}
-    - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+    TIER: api
+    MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-100}
+    RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
 
 # Agent Tier Environment
 x-env-tier-agent: &env-tier-agent
@@ -42,9 +43,9 @@ x-env-tier-agent: &env-tier-agent
     - env.shared
     - env.tier-agent  # Agent tier specific configuration
   environment:
-    - TIER=agent
-    - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-50}
-    - MCP_ENABLED=${MCP_ENABLED:-true}
+    TIER: agent
+    MAX_CONCURRENT_AGENTS: ${MAX_CONCURRENT_AGENTS:-50}
+    MCP_ENABLED: ${MCP_ENABLED:-true}
 
 # Worker Tier Environment
 x-env-tier-worker: &env-tier-worker
@@ -53,9 +54,9 @@ x-env-tier-worker: &env-tier-worker
     - env.shared
     - env.tier-worker # Worker tier specific configuration
   environment:
-    - TIER=worker
-    - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-10}
-    - WORKER_POOL_SIZE=${WORKER_POOL_SIZE:-4}
+    TIER: worker
+    MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-10}
+    WORKER_POOL_SIZE: ${WORKER_POOL_SIZE:-4}
 
 # Data Tier Environment
 x-env-tier-data: &env-tier-data
@@ -64,8 +65,8 @@ x-env-tier-data: &env-tier-data
     - env.shared
     - env.tier-data   # Data tier specific configuration
   environment:
-    - TIER=data
-    - MAX_CONNECTIONS=${MAX_CONNECTIONS:-100}
+    TIER: data
+    MAX_CONNECTIONS: ${MAX_CONNECTIONS:-100}
 
 # LLM Tier Environment
 x-env-tier-llm: &env-tier-llm
@@ -74,8 +75,8 @@ x-env-tier-llm: &env-tier-llm
     - env.shared
     - env.tier-llm    # LLM tier specific configuration
   environment:
-    - TIER=llm
-    - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-50}
+    TIER: llm
+    MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-50}
 
 # Media Tier Environment
 x-env-tier-media: &env-tier-media
@@ -84,18 +85,9 @@ x-env-tier-media: &env-tier-media
     - env.shared
     - env.tier-media  # Media tier specific configuration
   environment:
-    - TIER=media
-    - GPU_ENABLED=${GPU_ENABLED:-true}
-    - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-4}
-
-# UI Tier Environment
-x-env-tier-ui: &env-tier-ui
-  <<: *pmoves-env-base
-  env_file:
-    - env.shared
-    - env.tier-ui     # UI tier specific configuration
-  environment:
-    - TIER=ui
+    TIER: media
+    GPU_ENABLED: ${GPU_ENABLED:-true}
+    MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-4}
 
 # Health check template
 x-pmoves-healthcheck: &pmoves-healthcheck
@@ -121,8 +113,8 @@ x-pmoves-labels: &pmoves-labels
   labels:
     - "pmoves.service=true"
     - "prometheus.io/scrape=true"
-    - "prometheus.io.port=9090"
-    - "prometheus.io.path=/metrics"
+    - "prometheus.io/port=9090"
+    - "prometheus.io/path=/metrics"
 
 # Example service definition using the templates:
 #
@@ -133,12 +125,12 @@ x-pmoves-labels: &pmoves-labels
 #     ports:
 #       - "8080:8080"
 #     environment:
-#       - SERVICE_NAME=my-api-service
-#       - SERVICE_PORT=8080
+#       SERVICE_NAME: my-api-service
+#       SERVICE_PORT: 8080
 #
 #   my-gpu-worker:
 #     <<: [*env-tier-worker, *pmoves-gpu-resource, *pmoves-healthcheck]
 #     image: ghcr.io/powerfulmoves/my-gpu-worker:latest
 #     environment:
-#       - SERVICE_NAME=my-gpu-worker
-#       - CUDA_VISIBLE_DEVICES=0
+#       SERVICE_NAME: my-gpu-worker
+#       CUDA_VISIBLE_DEVICES: 0

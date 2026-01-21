@@ -33,21 +33,19 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from enum import Enum
 
 
 class ServiceTier(str, Enum):
-    """PMOVES service tiers."""
+    """PMOVES service tiers (6-tier architecture)."""
     DATA = "data"
     API = "api"
     LLM = "llm"
     MEDIA = "media"
     AGENT = "agent"
     WORKER = "worker"
-    APP = "app"
-    UI = "ui"
 
 
 @dataclass
@@ -65,7 +63,7 @@ class ServiceAnnouncement:
     health_check: str
     tier: ServiceTier
     port: int
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     # NATS subject for announcements
@@ -97,7 +95,7 @@ class ServiceAnnouncement:
             health_check=data["health_check"],
             tier=ServiceTier(data["tier"]),
             port=data["port"],
-            timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             metadata=data.get("metadata", {}),
         )
 
@@ -155,7 +153,7 @@ class ServiceAnnouncer:
             health_check=self.health_check,
             tier=self.tier,
             port=self.port,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             metadata=self.metadata,
         )
 
