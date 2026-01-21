@@ -7,34 +7,50 @@ Service discovery using the PMOVES service registry with fallback chain:
 3. NATS service announcements (real-time, cached)
 4. Docker DNS (development fallback)
 
-Usage:
-    from service_registry import get_service_url, ServiceInfo
+This module provides:
+- CommonServices: Environment-based service URL discovery
+- ServiceInfo: Immutable data class for service metadata
+- get_service_url(): Resolve service URL with fallback chain
+- get_service_info(): Get full service metadata
 
-    # Simple URL resolution
+Usage:
+    from pmoves_registry import get_service_url, ServiceInfo, CommonServices
+
+    # Simple URL resolution via CommonServices
+    url = CommonServices.get("hirag_v2")
+
+    # Or use the async function with fallback
     url = await get_service_url("hirag-v2")
 
     # Get full service info
     info = await get_service_info("hirag-v2")
     print(f"{info.name}: {info.health_check_url}")
+
+Environment Variables:
+    Services can be configured via environment variables in format:
+    {SERVICE_SLUG}_URL (e.g., HIRAG_V2_URL=http://hirag-v2:8086)
 """
 
 import asyncio
 import os
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Optional
 
 
-class ServiceTier(str, Enum):
-    """PMOVES service tiers."""
-    DATA = "data"
-    API = "api"
-    LLM = "llm"
-    MEDIA = "media"
-    AGENT = "agent"
-    WORKER = "worker"
-    APP = "app"
-    UI = "ui"
+# Import ServiceTier from shared types if available, otherwise define locally
+try:
+    from pmoves_common import ServiceTier
+except ImportError:
+    from enum import Enum
+
+    class ServiceTier(str, Enum):
+        """PMOVES service tiers (6-tier architecture)."""
+        DATA = "data"
+        API = "api"
+        LLM = "llm"
+        MEDIA = "media"
+        AGENT = "agent"
+        WORKER = "worker"
 
 
 @dataclass(frozen=True)

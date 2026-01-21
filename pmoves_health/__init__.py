@@ -4,13 +4,38 @@ PMOVES.AI Health Endpoint Template
 Standard health check endpoint for all PMOVES services.
 Follows PMOVES.AI conventions for service health monitoring.
 
+This module provides:
+- HealthChecker: Class for managing multiple dependency health checks
+- DependencyCheck: Base class for creating custom health checks
+- DatabaseCheck, HTTPCheck, NATSCheck: Pre-built check implementations
+- health_check(): Decorator for registering checks
+- create_health_app(): Factory for creating standalone health apps
+- health_check_router: FastAPI router for adding to existing apps
+
+Health Endpoint Behavior:
+- Returns HTTP 200 when status is "healthy" or "degraded"
+- Returns HTTP 503 when status is "unhealthy"
+- Includes timestamp, service name, and individual check results
+
 Usage:
-    from pmoves_health import create_health_app
-    app = create_health_app()
+    from pmoves_health import create_health_app, HealthChecker, NATSCheck
+
+    # Create a standalone health app
+    app = create_health_app("my-service")
 
     # Or add to existing FastAPI app
     from pmoves_health import health_check_router
     app.include_router(health_check_router)
+
+    # Or use the checker directly
+    checker = HealthChecker("my-service")
+    checker.nats("nats://nats:4222")
+    status = await checker.check_all()
+
+Health Status Values:
+- healthy: All required checks passing
+- degraded: Optional checks failing, required checks passing
+- unhealthy: One or more required checks failing
 """
 
 from datetime import datetime, timezone
