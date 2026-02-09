@@ -1143,9 +1143,10 @@ async def _find_most_related_edges_from_paths(
     # all_reasoning_path = await asyncio.gather(
     #                         *[knowledge_graph_inst.get_edge(e[0], e[1]) for e in knowledge_graph_inst._graph.subgraph(path).edges()]
     #                     )
-    all_reasoning_path = knowledge_graph_inst._graph.subgraph(path).edges()
+    all_reasoning_path = await knowledge_graph_inst.subgraph_edges(path)
     all_edges = set()
-    all_edges.update([tuple(sorted(e)) for e in all_reasoning_path])
+    print(all_reasoning_path)
+    all_edges.update([tuple(sorted(e[:2])) for e in all_reasoning_path])
     all_edges = list(all_edges)
     all_edges_pack = await asyncio.gather(
         *[knowledge_graph_inst.get_edge(e[0], e[1]) for e in all_edges]
@@ -1302,36 +1303,56 @@ async def _build_hierarchical_query_context(
     #     node_datas, query_param, knowledge_graph_inst
     # )
 
-    def find_path_with_required_nodes(graph, source, target, required_nodes):
+    async def find_path_with_required_nodes(knowledge_graph_inst, source, target, required_nodes):
         # inital final path
         final_path = []
-        # 起点设置为当前节点
+        # start node
         current_node = source
 
-        # 遍历必经节点
+        # all gdb cls
+        from ._storage.gdb_neo4j import Neo4jStorage
+        from ._storage.gdb_networkx import NetworkXStorage
+        
+        # traverse the required nodes
         for next_node in required_nodes:
             # 找到从当前节点到下一个必经节点的最短路径
             try:
-                sub_path = nx.shortest_path(graph, source=current_node, target=next_node)
+                if isinstance(knowledge_graph_inst, Neo4jStorage):
+                    # use Neo4j's shortest_path method
+                    sub_path = await knowledge_graph_inst.shortest_path(current_node, next_node)
+                elif isinstance(knowledge_graph_inst, NetworkXStorage):
+                    # use NetworkX's shortest_path method
+                    sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=next_node)
+                else:
+                    # use NetworkX by default
+                    sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=next_node)
             except nx.NetworkXNoPath:
                 # raise ValueError(f"No path between {current_node} and {next_node}.")
                 final_path.extend([next_node])
                 current_node = next_node
                 continue
             
-            # 合并路径（避免重复添加当前节点）
+            # merge paths (avoid adding the current node again)
             if final_path:
-                final_path.extend(sub_path[1:])  # 从第二个节点开始添加，避免重复
+                final_path.extend(sub_path[1:])  # add from the second node, avoid adding the current node again
             else:
                 final_path.extend(sub_path)
             
-            # 更新当前节点为下一个必经节点
+            # update the current node to the next required node
             current_node = next_node
 
-        # 最后，从最后一个必经节点到目标节点的路径
+        # finally, the path from the last required node to the target node
         try:
-            sub_path = nx.shortest_path(graph, source=current_node, target=target)
-            final_path.extend(sub_path[1:])  # 从第二个节点开始添加，避免重复
+            if isinstance(knowledge_graph_inst, Neo4jStorage):
+                # use Neo4j's shortest_path method
+                sub_path = await knowledge_graph_inst.shortest_path(current_node, target)
+            elif isinstance(knowledge_graph_inst, NetworkXStorage):
+                # use NetworkX's shortest_path method
+                sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=target)
+            else:
+                # use NetworkX by default
+                sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=target)
+            final_path.extend(sub_path[1:])  # add from the second node, avoid adding the current node again
         except nx.NetworkXNoPath:
             # raise ValueError(f"No path between {current_node} and {target}.")
             final_path.extend([target])
@@ -1357,7 +1378,7 @@ async def _build_hierarchical_query_context(
     key_entities = list(set([k for kk in key_entities for k in kk]))
     # find the shortest path between the key entities
     try:
-        path = find_path_with_required_nodes(knowledge_graph_inst._graph, key_entities[0], key_entities[-1], key_entities[1:-1])
+        path = await find_path_with_required_nodes(knowledge_graph_inst, key_entities[0], key_entities[-1], key_entities[1:-1])
         # path = list(set(path))
         path_datas = await asyncio.gather(      # get full information of retrieved entities
             *[knowledge_graph_inst.get_node(r) for r in path]
@@ -1502,36 +1523,43 @@ async def _build_hibridge_query_context(
     #     node_datas, query_param, knowledge_graph_inst
     # )
 
-    def find_path_with_required_nodes(graph, source, target, required_nodes):
+    async def find_path_with_required_nodes(knowledge_graph_inst, source, target, required_nodes):
         # inital final path
         final_path = []
-        # 起点设置为当前节点
         current_node = source
 
-        # 遍历必经节点
+        from ._storage.gdb_neo4j import Neo4jStorage
+        from ._storage.gdb_networkx import NetworkXStorage
+        
         for next_node in required_nodes:
-            # 找到从当前节点到下一个必经节点的最短路径
             try:
-                sub_path = nx.shortest_path(graph, source=current_node, target=next_node)
+                if isinstance(knowledge_graph_inst, Neo4jStorage):
+                    sub_path = await knowledge_graph_inst.shortest_path(current_node, next_node)
+                elif isinstance(knowledge_graph_inst, NetworkXStorage):
+                    sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=next_node)
+                else:
+                    sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=next_node)
             except nx.NetworkXNoPath:
                 # raise ValueError(f"No path between {current_node} and {next_node}.")
                 final_path.extend([next_node])
                 current_node = next_node
                 continue
             
-            # 合并路径（避免重复添加当前节点）
             if final_path:
-                final_path.extend(sub_path[1:])  # 从第二个节点开始添加，避免重复
+                final_path.extend(sub_path[1:])
             else:
                 final_path.extend(sub_path)
             
-            # 更新当前节点为下一个必经节点
             current_node = next_node
 
-        # 最后，从最后一个必经节点到目标节点的路径
         try:
-            sub_path = nx.shortest_path(graph, source=current_node, target=target)
-            final_path.extend(sub_path[1:])  # 从第二个节点开始添加，避免重复
+            if isinstance(knowledge_graph_inst, Neo4jStorage):
+                sub_path = await knowledge_graph_inst.shortest_path(current_node, target)
+            elif isinstance(knowledge_graph_inst, NetworkXStorage):
+                sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=target)
+            else:
+                sub_path = nx.shortest_path(knowledge_graph_inst._graph, source=current_node, target=target)
+            final_path.extend(sub_path[1:])
         except nx.NetworkXNoPath:
             # raise ValueError(f"No path between {current_node} and {target}.")
             final_path.extend([target])
@@ -1557,7 +1585,7 @@ async def _build_hibridge_query_context(
     key_entities = list(set([k for kk in key_entities for k in kk]))
     # find the shortest path between the key entities
     try:
-        path = find_path_with_required_nodes(knowledge_graph_inst._graph, key_entities[0], key_entities[-1], key_entities[1:-1])
+        path = await find_path_with_required_nodes(knowledge_graph_inst, key_entities[0], key_entities[-1], key_entities[1:-1])
         # path = list(set(path))
         path_datas = await asyncio.gather(      # get full information of retrieved entities
             *[knowledge_graph_inst.get_node(r) for r in path]

@@ -239,3 +239,16 @@ class NetworkXStorage(BaseGraphStorage):
 
         nodes_ids = [self._graph.nodes[node_id]["id"] for node_id in nodes]
         return embeddings, nodes_ids
+
+    async def subgraph_edges(self, nodes: list) -> list:
+        """get the edge list of the subgraph of the specified nodes"""
+        if not nodes:
+            return []
+        
+        subgraph = self._graph.subgraph(nodes)
+        edges = []
+        for edge in subgraph.edges(data=True):
+            source, target, data = edge
+            weight = data.get('weight', 0.0)
+            edges.append((source, target, weight))
+        return edges

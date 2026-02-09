@@ -7,6 +7,7 @@ from openai import AsyncOpenAI, OpenAI
 from dataclasses import dataclass
 from hirag.base import BaseKVStorage
 from hirag._utils import compute_args_hash
+from hirag._storage import Neo4jStorage, NetworkXStorage
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -103,7 +104,10 @@ graph_func = HiRAG(working_dir=config['hirag']['working_dir'],
                       enable_hierachical_mode=config['hirag']['enable_hierachical_mode'], 
                       embedding_batch_num=config['hirag']['embedding_batch_num'],
                       embedding_func_max_async=config['hirag']['embedding_func_max_async'],
-                      enable_naive_rag=config['hirag']['enable_naive_rag'])
+                      enable_naive_rag=config['hirag']['enable_naive_rag'],
+                      graph_storage_cls=NetworkXStorage,
+                      addon_params={"neo4j_url": config['hirag']['neo4j_url'], "neo4j_auth": config['hirag']['neo4j_auth']}
+                      )
 
 # comment this if the working directory has already been indexed
 with open("your .txt file path") as f:

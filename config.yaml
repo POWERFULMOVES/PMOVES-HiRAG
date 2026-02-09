@@ -32,3 +32,5 @@ hirag:
   embedding_batch_num: 6
   embedding_func_max_async: 8
   enable_naive_rag: true
+  neo4j_url: "neo4j://localhost:****"
+  neo4j_auth: ["neo4j", "****"]

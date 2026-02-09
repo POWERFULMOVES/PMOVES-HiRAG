@@ -34,6 +34,7 @@ from ._storage import (
     JsonKVStorage,
     NanoVectorDBStorage,
     NetworkXStorage,
+    Neo4jStorage,
 )
 from ._utils import (
     EmbeddingFunc,
