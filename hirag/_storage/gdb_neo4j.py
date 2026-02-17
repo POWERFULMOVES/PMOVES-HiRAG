@@ -17,8 +17,32 @@ def make_path_idable(path):
     return path.replace(".", "_").replace("/", "__").replace("-", "_")
 
 
+_ALLOWED_LABELS = frozenset({
+    # Core NER entity types
+    "UNKNOWN", "ENTITY", "PERSON", "ORGANIZATION", "LOCATION", "EVENT",
+    "CONCEPT", "DOCUMENT", "CHUNK", "TOPIC", "DATE", "TIME", "DATETIME",
+    # Extended entity types common in knowledge graphs
+    "PRODUCT", "TECHNOLOGY", "SERVICE", "SYSTEM", "TOOL", "FRAMEWORK",
+    "LANGUAGE", "PROTOCOL", "PLATFORM", "API", "LIBRARY", "MODULE",
+    # Domain-specific types
+    "METRIC", "PROCESS", "ROLE", "SKILL", "RESOURCE", "CATEGORY",
+    "PROJECT", "TASK", "GOAL", "REQUIREMENT", "FEATURE", "COMPONENT",
+    # Relationship-like entity types
+    "ACTION", "METHOD", "FUNCTION", "ATTRIBUTE", "PROPERTY", "VALUE",
+    # Media / content types
+    "VIDEO", "AUDIO", "IMAGE", "FILE", "URL", "EMAIL", "PHONE",
+    # Abstract types
+    "IDEA", "THEORY", "PATTERN", "PRINCIPLE", "RULE", "POLICY",
+    "STANDARD", "SPECIFICATION", "MODEL", "ALGORITHM", "DATA",
+})
+
+
 def _sanitize_label(raw_label: str) -> str:
-    """Ensure dynamic labels comply with Neo4j naming rules."""
+    """Ensure dynamic labels comply with Neo4j naming rules and allowlist.
+
+    Rejects any label not in _ALLOWED_LABELS to prevent Cypher injection
+    via f-string label interpolation.
+    """
     if not raw_label:
         return "UNKNOWN"
     label = raw_label.strip().replace(" ", "_")
@@ -29,7 +53,10 @@ def _sanitize_label(raw_label: str) -> str:
         return "UNKNOWN"
     if label[0].isdigit():
         label = f"_{label}"
-    return label.upper()
+    label = label.upper()
+    if label not in _ALLOWED_LABELS:
+        return "UNKNOWN"
+    return label
 
 
 @dataclass
