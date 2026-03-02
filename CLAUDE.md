@@ -138,11 +138,34 @@ Services that query Hi-RAG:
 4. **Collection mismatch:** Ensure `QDRANT_COLLECTION` matches the collection used by Extract Worker
 5. **Embedding dimension:** `all-MiniLM-L6-v2` produces 384-dim vectors; `qwen3-embedding:4b` produces 2048-dim
 
+## CHIT & Geometry Bus Integration
+
+Hi-RAG v2 is a **Full CHIT integration service** — both producer and consumer of CGP packets with security verification.
+
+**Key Files:**
+- `pmoves/services/common/geometry_decoder.py` — Shared CGP decoder (`verify_cgp`, `decrypt_anchors`, `extract_text`, `extract_geometry`)
+- `app.py` — NATS geometry subscriber + CGP ingestion into shape store
+
+**NATS Subjects:**
+- `geometry.cgp.v1` (subscribe + publish) — CGP transport
+- `geometry.swarm.meta.v1` (subscribe) — Swarm pack activation/deactivation
+
+**Capabilities:**
+- CHIT security verification via `geometry_decoder.py`
+- HMAC signature verification on incoming CGP
+- AES-GCM anchor decryption (optional)
+- Shape store integration for CGP ingestion
+- Real-time geometry broadcasting via Supabase
+
+**CGP Schema:** v0.1/v0.2 (upgrade to canonical `chit.cgp.v1.0` pending). See `pmoves/docs/audit/CHIT_INTEGRATION_STATUS.md`.
+
+**Security note:** Neo4j label allowlist validation (Phase H fix) also applies to CGP-derived graph queries.
+
 <!-- PMOVES.AI-CONTEXT-TAGS -->
 ## PMOVES.AI Skill Hints
 
 **Primary Skills:** `/search:hirag`, `/deploy:up`, `/health:quick`, `/gpu:status`
-**Context Files:** `services-catalog.md`
-**Domain Tags:** `retrieval`, `knowledge`
+**Context Files:** `services-catalog.md`, `geometry-nats-subjects.md`, `chit-geometry-bus.md`
+**Domain Tags:** `retrieval`, `knowledge`, `chit`
 **Context Tier:** 2 (On-Demand (Major Subsystem))
 <!-- /PMOVES.AI-CONTEXT-TAGS -->
