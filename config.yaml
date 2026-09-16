@@ -5,6 +5,16 @@ openai:
   api_key: "***"
   base_url: "***"
 
+# Example config.yaml structure
+ollama:
+  base_url: http://localhost:11434  # Default Ollama URL
+  embedding_model: None # Or another suitable embedding model
+  chat_model: rjmalagon/gte-qwen2-7b-instruct:f16
+  embedding_dim: 768 # Dimension for nomic-embed-text, adjust if using another model
+# ... other configs like model_params, hirag ...
+model_params:
+  max_token_size: 8192 # Example, adjust as needed
+
 # GLM Configuration
 glm:
   model: "glm-4-plus"
@@ -18,16 +28,23 @@ deepseek:
   api_key: "***"
   base_url: "https://api.deepseek.com"
 
+cohere:
+  api_key: "***"
+  model: "command-r"
+  embedding_model: "embed-english-v3.0"
+  embedding_dim: 1024
+
 # Model Parameters
 model_params:
   openai_embedding_dim: 1536
   glm_embedding_dim: 2048
+  cohere_embedding_dim: 1024
   max_token_size: 8192
 
 # HiRAG Configuration
 hirag:
-  working_dir: "your_work_dir"
-  enable_llm_cache: false
+  working_dir: "./hirag_index_cohere
+  enable_llm_cache: true
   enable_hierachical_mode: true
   embedding_batch_num: 6
   embedding_func_max_async: 8

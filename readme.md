@@ -4,6 +4,10 @@ Hybrid Retrieval-Augmented Generation (RAG) system combining vector search, grap
 
 This is PMOVES.AI's integration and deployment of [HiRAG: Retrieval-Augmented Generation with Hierarchical Knowledge](https://arxiv.org/abs/2503.10150), accepted to EMNLP 2025 Findings.
 
+<p align="center">
+    <img src="./imgs/icon2.png" width="20%" style="max-width: 80;">
+</p>
+
 ## Overview
 
 PMOVES-HiRAG is a production-ready implementation of the HiRAG research system, designed for high-performance knowledge retrieval in the PMOVES.AI ecosystem. It features:
@@ -20,6 +24,9 @@ PMOVES-HiRAG is a production-ready implementation of the HiRAG research system, 
 ## Architecture
 
 ![HiRAG Architecture](./imgs/hirag_ds_trans.drawio.png)
+
+- PMOVES fork of [HiRAG: Retrieval-Augmented Generation with Hierarchical Knowledge](https://arxiv.org/abs/2503.10150) — EMNLP 2025 Findings.
+- Upstream's follow-up work: **[DeepRefine](https://github.com/HKUST-KnowComp/DeepRefine)** (test-time knowledge-base refinement).
 
 ### Key Components
 
@@ -492,3 +499,7 @@ For issues and questions:
 - PMOVES.AI integration: Open an issue in the PMOVES.AI repository
 - HiRAG core functionality: Refer to [original HiRAG repo](https://github.com/hhy-huang/HiRAG)
 - Production deployment: See PMOVES.AI documentation at `.claude/CLAUDE.md`
+
+---
+
+![Star History Chart](https://api.star-history.com/svg?repos=hhy-huang/HiRAG&type=Date)

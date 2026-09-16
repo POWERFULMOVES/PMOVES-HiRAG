@@ -16,6 +16,14 @@ from ._llm import (
     azure_gpt_4o_complete,
     azure_openai_embedding,
     azure_gpt_4o_mini_complete,
+    gpt_custom_model_complete,
+    azure_openai_custom_model_complete,
+    deepseek_embedding,
+    deepseek_complete,
+    ollama_embedding,
+    ollama_complete,
+    cohere_embedding,
+    cohere_complete
 )
 from ._op import (
     chunking_by_token_size,
@@ -53,6 +61,20 @@ from .base import (
 )
 
 
+def determine_default_provider():
+    """Determine the default provider based on environment variables"""
+    if 'GLM_MODEL' in os.environ:
+        return "glm"
+    elif 'DEEPSEEK_API_KEY' in os.environ and os.environ.get('DEEPSEEK_API_KEY'):
+        return "deepseek"
+    elif os.environ.get('OPENAI_API_BASE', '').find('ollama') >= 0 or os.environ.get('OPENAI_API_KEY') == 'ollama':
+        return "ollama"
+    elif os.environ.get('AZURE_OPENAI_API_KEY'):
+        return "azure"
+    else:
+        return "openai"
+
+
 @dataclass
 class HiRAG:
     working_dir: str = field(
@@ -76,7 +98,7 @@ class HiRAG:
     ] = chunking_by_token_size
     chunk_token_size: int = 1200
     chunk_overlap_token_size: int = 100
-    tiktoken_model_name: str = "gpt-4o"
+    tiktoken_model_name: str = "cl100k_base"  # Use cl100k_base as default tokenizer
 
     # entity extraction
     entity_extract_max_gleaning: int = 1
@@ -91,7 +113,7 @@ class HiRAG:
     node_embedding_algorithm: str = "node2vec"
     node2vec_params: dict = field(
         default_factory=lambda: {
-            "dimensions": 1536,
+            "dimensions": 3584,  # Use 3584 as default for gte-qwen2-7b
             "num_walks": 10,
             "walk_length": 40,
             "num_walks": 10,
@@ -107,18 +129,57 @@ class HiRAG:
     )
 
     # text embedding
-    embedding_func: EmbeddingFunc = field(default_factory=lambda: openai_embedding)
+    embedding_func: EmbeddingFunc = field(
+        default_factory=lambda: (
+            ollama_embedding
+            if os.environ.get("PROVIDER", determine_default_provider()).lower() in ("ollama", "glm")
+            else (
+                deepseek_embedding
+                if os.environ.get("PROVIDER", determine_default_provider()).lower() == "deepseek"
+                else openai_embedding
+            )
+        )
+    )
     embedding_batch_num: int = 32
     embedding_func_max_async: int = 8
     query_better_than_threshold: float = 0.2
 
     # LLM
-    using_azure_openai: bool = False
-    # best_model_func: callable = gpt_35_turbo_complete
-    best_model_func: callable = gpt_4o_mini_complete
+    using_azure_openai: bool = field(
+        default_factory=lambda: os.environ.get("PROVIDER", determine_default_provider()).lower() == "azure"
+    )
+    best_model_func: callable = field(
+        default_factory=lambda: (
+            # Determine provider from environment variable
+            ollama_complete
+            if os.environ.get("PROVIDER", determine_default_provider()).lower() in ("ollama", "glm")
+            else (
+                deepseek_complete
+                if os.environ.get("PROVIDER", determine_default_provider()).lower() == "deepseek"
+                else (
+                    # For OpenAI and Azure, use the custom model if specified
+                    gpt_custom_model_complete 
+                    if os.environ.get("OPENAI_MODEL_NAME") or os.environ.get("OPENAI_MODEL")
+                    else gpt_4o_mini_complete
+                )
+            )
+        )
+    )
     best_model_max_token_size: int = 32768
     best_model_max_async: int = 8
-    cheap_model_func: callable = gpt_35_turbo_complete
+    
+    cheap_model_func: callable = field(
+        default_factory=lambda: (
+            # Determine provider from environment variable
+            ollama_complete
+            if os.environ.get("PROVIDER", determine_default_provider()).lower() in ("ollama", "glm")
+            else (
+                deepseek_complete
+                if os.environ.get("PROVIDER", determine_default_provider()).lower() == "deepseek"
+                else gpt_35_turbo_complete
+            )
+        )
+    )
     cheap_model_max_token_size: int = 32768
     cheap_model_max_async: int = 8
 
@@ -146,6 +207,10 @@ class HiRAG:
             # If there's no OpenAI API key, use Azure OpenAI
             if self.best_model_func == gpt_4o_complete:
                 self.best_model_func = azure_gpt_4o_complete
+            elif self.best_model_func == gpt_custom_model_complete:
+                self.best_model_func = azure_openai_custom_model_complete
+            elif self.best_model_func == gpt_4o_mini_complete:
+                self.best_model_func = azure_gpt_4o_mini_complete
             if self.cheap_model_func == gpt_4o_mini_complete:
                 self.cheap_model_func = azure_gpt_4o_mini_complete
             if self.embedding_func == openai_embedding:
@@ -153,6 +218,22 @@ class HiRAG:
             logger.info(
                 "Switched the default openai funcs to Azure OpenAI if you didn't set any of it"
             )
+        
+        # Log which provider we're using
+        provider = os.environ.get("PROVIDER", determine_default_provider()).lower()
+        model_name = os.environ.get("OPENAI_MODEL_NAME", os.environ.get("OPENAI_MODEL", 
+                                   os.environ.get("GLM_MODEL", "default model")))
+        
+        if provider == "ollama":
+            logger.info(f"Using Ollama as provider with model: {model_name}")
+        elif provider == "glm":
+            logger.info(f"Using GLM as provider with model: {model_name}")
+        elif provider == "deepseek":
+            logger.info(f"Using DeepSeek as provider with model: {model_name}")
+        elif provider == "azure":
+            logger.info(f"Using Azure OpenAI as provider with model: {model_name}")
+        else:
+            logger.info(f"Using OpenAI as provider with model: {model_name}")
 
         if not os.path.exists(self.working_dir) and self.always_create_working_dir:
             logger.info(f"Creating working directory {self.working_dir}")
