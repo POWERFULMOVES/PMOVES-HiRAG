@@ -8,7 +8,30 @@ from typing import Callable, Dict, List, Optional, Type, Union, cast
 import tiktoken
 
 
+# The LLM helpers live in TWO modules, and this import used to name only one
+# of them.
+#
+# MEASURED 2026-11-05 at the pinned commit 8e5283a7eed86ccda6cf08418405c10e6ca13815:
+# upstream split this package's LLM layer in two -- `_llm.py` kept only the
+# COHERE helpers, and the OpenAI / Azure / DeepSeek / Ollama implementations
+# were moved into `_llm_backup.py` -- but this import was never updated to
+# follow the move. `from hirag import HiRAG` therefore died with
+# `ImportError: cannot import name 'gpt_4o_complete' from 'hirag._llm'`, and
+# the whole package was unimportable.
+#
+# The split itself is upstream's and is CORRECT: `_llm_backup.py` defines
+# every one of the 13 names below (plus the four session factories), and
+# `_llm.py` defines the two Cohere ones. So the fix is to import each name
+# from the module that actually defines it: no code is duplicated, and no
+# upstream file is edited.
+#
+# Upstream `main` is still at this same commit and still broken, so there is
+# no upstream fix to sync from -- this has to be repaired in the fork.
 from ._llm import (
+    cohere_embedding,
+    cohere_complete,
+)
+from ._llm_backup import (
     gpt_4o_complete,
     gpt_4o_mini_complete,
     gpt_35_turbo_complete,
@@ -22,8 +45,6 @@ from ._llm import (
     deepseek_complete,
     ollama_embedding,
     ollama_complete,
-    cohere_embedding,
-    cohere_complete
 )
 from ._op import (
     chunking_by_token_size,

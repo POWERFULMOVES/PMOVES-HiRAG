@@ -43,7 +43,7 @@ model_params:
 
 # HiRAG Configuration
 hirag:
-  working_dir: "./hirag_index_cohere
+  working_dir: "./hirag_index_cohere"
   enable_llm_cache: true
   enable_hierachical_mode: true
   embedding_batch_num: 6
