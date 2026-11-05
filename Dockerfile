@@ -45,16 +45,16 @@
 #     requires_python ">=3.10", so 3.9 cannot satisfy the pinned dependency set;
 #   - 3.11 is the PMOVES house base image (pmoves/services/*/Dockerfile use python:3.11-slim).
 #
-# readme.md (lowercase) is copied because setup.py opens it at build time:
-#   setup.py:  with open("readme.md", "r") as fh: long_description = fh.read()
-# The repo tracks BOTH spellings as separate blobs at HEAD:
-#   README.md  blob 0d470880f9e00af3afcbb650c6dee84a6d1a3b73   13,406 bytes
-#   readme.md  blob 754d7ad9f70529f4ebef38f41f704d7b4a31733e   13,869 bytes
-# On a case-insensitive client (this build ran on Windows/NTFS) the checkout collapses
-# them into a single 14,374-byte on-disk file, so the COPY below resolves to that
-# client-side artifact rather than the exact lowercase blob. That only affects the
-# package long_description; setup.py needs the file to exist and be readable, and a
-# Linux/case-sensitive reviewer gets the true readme.md blob.
+# README.md is the ONE readme this repo tracks.
+# The fork used to track BOTH spellings as separate blobs -- README.md (13,406 bytes,
+# upstream PR #1) and readme.md (13,869 bytes, the fork's newer revision carrying the
+# PMOVES icon, the DeepRefine note and the star-history chart). On a case-insensitive
+# client (Windows/NTFS, macOS) the checkout COLLAPSES them into one on-disk file, so the
+# submodule was permanently dirty and the COPY below resolved to a 14,374-byte
+# client-side artefact (the CRLF-translated lowercase blob) rather than an exact blob.
+# FIXED by keeping the CANONICAL name README.md, giving it the fork's content, and
+# dropping readme.md -- so the name, the content and the build all agree on one file.
+# setup.py opens README.md for long_description.
 #
 # eval/datasets/** is intentionally NOT copied. Measured: 61 files, 69,329,458 bytes total,
 # largest single file 22,266,872 bytes. No module reads them at import time — eval/batch_eval.py
@@ -128,26 +128,47 @@ RUN pip install --no-cache-dir "cohere==4.57" && \
 # statement), so the library and the evaluation harness are unaffected. The pins are left
 # exactly as the repo has them rather than silently changing numpy.
 #
-# KNOWN, PRE-EXISTING UPSTREAM ISSUE in the `hirag` package itself:
-# `from hirag import HiRAG, QueryParam` (the import eval/eval_mhqa.py performs) fails with
+# THE `hirag` PACKAGE'S IMPORT SPLIT -- FIXED HERE, AND NOW GATED BY THIS BUILD.
+# Upstream split the package's LLM layer in two: `hirag/_llm.py` kept only the COHERE
+# helpers, and the OpenAI / Azure / DeepSeek / Ollama implementations were moved into
+# `hirag/_llm_backup.py`. But `hirag/hirag.py` kept importing the moved names from `._llm`,
+# so `from hirag import HiRAG, QueryParam` -- the import `eval/eval_mhqa.py` performs --
+# died with:
 #     ImportError: cannot import name 'gpt_4o_complete' from 'hirag._llm'
-# because hirag/hirag.py imports 14 names from ._llm (gpt_4o_complete, openai_embedding,
-# deepseek_complete, ollama_embedding, ...) while hirag/_llm.py only defines the cohere
-# ones (get_cohere_async_client_instance, _format_chat_history_for_cohere,
-# cohere_complete_if_cache, cohere_complete, cohere_embedding, example_main).
-# This is an upstream defect, not a fork one: the fork's hirag/_llm.py is byte-identical
+# This was an upstream defect, not a fork one: the fork's `hirag/_llm.py` is byte-identical
 # to upstream's (SHA256 CD611C600401428F56AA79B2F6C7BA6FAA2760F9A739F0C08A8B86F250E05738
-# for both) and upstream's hirag/hirag.py carries the same 14-name import block.
-# Fixing it means editing hirag/_llm.py or hirag/hirag.py, which is outside the scope of
-# this Dockerfile-only change, so the defect is reported rather than papered over.
+# for both) and upstream's `hirag/hirag.py` carries the same import block. Upstream `main`
+# is still at that commit and still broken, so there was no upstream fix to sync from.
+# FIXED in the fork by importing each name from the module that actually DEFINES it:
+# `cohere_embedding` / `cohere_complete` from `._llm`, the other 13 from `._llm_backup`.
+# No function body is duplicated and no upstream file is edited.
+#
+# GATED: the RUN step further down imports the package DURING the image build, so a build
+# of a tree where the split is broken again FAILS instead of shipping an image whose
+# library cannot be imported.
 
 # The package itself, plus the code the image is for.
-# setup.py + readme.md must be present for the build (setup.py opens "readme.md").
-COPY setup.py readme.md ./
+# setup.py + README.md must be present for the build (setup.py opens "README.md").
+COPY setup.py README.md ./
 COPY hirag/ ./hirag/
 # eval/ is copied FILE BY FILE on purpose: `COPY eval/ ./eval/` would also copy
 # eval/datasets/** (61 files, 69,329,458 bytes) into the image. The 12 harness scripts
 # are the only things the image needs from that directory.
+#
+# KNOWN, SEPARATE UPSTREAM DEFECT in the HARNESS (not the library, and NOT fixed
+# here): `eval/eval_mhqa.py` reads a DIFFERENT config schema than `config.yaml`
+# provides. It wants `config['glm']['url']`, `config['openai']['url']` and a
+# `config['nvidia'][...]` section, while config.yaml carries `base_url` (not `url`)
+# and has no `nvidia` section at all. MEASURED 2026-11-05: after the YAML was made
+# parseable, `import eval.eval_mhqa` reached line 34 and died with
+# `KeyError: 'url'`.
+# This is a CONTRACT mismatch between two upstream files, not a one-character fix --
+# repairing it means deciding which spelling is canonical and what an `nvidia`
+# section should contain -- so it is REPORTED here rather than guessed at. The
+# image's gates above cover the LIBRARY import and the config's YAML validity,
+# which are what this fork repairs; they deliberately do not gate on the harness
+# import, because a gate that fails on an unrelated disclosed defect would block
+# the image forever.
 COPY eval/batch_eval.py eval/cal_time.py eval/cal_tokens.py eval/eval_mhqa.py \
      eval/extract_context.py eval/extract_query.py eval/insert_context_deepseek.py \
      eval/insert_context_glm.py eval/insert_context_openai.py eval/test_deepseek.py \
@@ -162,10 +183,37 @@ COPY config.yaml ./config.yaml
 
 # Install the library in editable mode so /app/hirag stays the single source of truth and
 # `from hirag import HiRAG, QueryParam` resolves from any working directory (eval/eval_mhqa.py
-# imports exactly that; note the upstream defect documented above, which makes that import
-# fail for a reason that has nothing to do with this install step). --no-deps because the
-# pinned deps are already installed above and setup.py would otherwise re-resolve them.
+# imports exactly that). --no-deps because the pinned deps are already installed above and
+# setup.py would otherwise re-resolve them.
 RUN pip install --no-cache-dir --no-deps -e .
+
+# THE IMPORT GATE. The image is only worth building if the library it ships can actually be
+# imported, and the split this Dockerfile documents above was invisible until something
+# tried it. So the build itself tries it: this RUN imports the package, and the image build
+# FAILS if the import regresses. It is a gate in the tree, on the real path, not a note in
+# a comment.
+#
+# MEASURED 2026-11-05: before the split was repaired this line raised
+#   ImportError: cannot import name 'gpt_4o_complete' from 'hirag._llm'
+# and the image built anyway -- shipping a library that no caller could import.
+RUN python -c "from hirag import HiRAG, QueryParam; print('hirag imports OK:', HiRAG.__name__, QueryParam.__name__)"
+
+# THE CONFIG GATE, for the same reason: the harness reads config.yaml at IMPORT
+# time (`eval/eval_mhqa.py` opens it at module scope), so a config.yaml that does
+# not parse makes the harness unimportable even though the library is fine.
+#
+# MEASURED 2026-11-05: upstream's config.yaml line 46 read
+#     working_dir: "./hirag_index_cohere
+# -- an UNTERMINATED double-quoted scalar -- so `yaml.safe_load` raised
+# `ParserError: while parsing a block mapping ... expected <block end>` and
+# `import eval.eval_mhqa` died before it did any work. The file was byte-identical
+# to upstream's (blob 4a0258a032a3c38e7efacc5fd4d5be822c021cd0), so this was
+# upstream's defect too. FIXED by closing the quote.
+#
+# pyyaml is already in this image as the harness's own dependency, so this gate
+# adds no new dependency -- it only checks the config the harness is about to
+# read.
+RUN python -c "import yaml; yaml.safe_load(open('config.yaml', encoding='utf-8')); print('config.yaml parses OK')"
 
 # House convention: non-root uid/gid 65532.
 RUN groupadd -r pmoves --gid=65532 && \
